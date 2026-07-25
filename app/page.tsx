@@ -513,7 +513,7 @@ export default function Home() {
                 }}
               />
               <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent_60%)]" />
-              <span className="relative">Mulai</span>
+              <span className="relative">Next</span>
             </button>
           </div>
         ) : (
@@ -862,7 +862,7 @@ export default function Home() {
                           currentIndex >= lines.length - 1 ? "text-zinc-500" : "text-white"
                         }`}
                       >
-                        Next →
+                        Mulai
                       </span>
                     </button>
                   )}
