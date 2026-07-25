@@ -5,8 +5,14 @@ import { useState, useRef, useCallback, useEffect } from "react"
 type Line = {
   id: number
   text: string
+  translation: string | null
+  hasJapanese: boolean
   singer: "A" | "B"
   timestamp: number | null
+}
+
+function hasJapaneseChars(s: string): boolean {
+  return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(s)
 }
 
 type AnimMode = "textype" | "splittext"
@@ -66,6 +72,7 @@ export default function Home() {
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [wordIdx, setWordIdx] = useState(0)
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const typingRef = useRef<number | null>(null)
@@ -238,10 +245,26 @@ export default function Home() {
   }, [volume, gainNode])
 
   const handleStart = () => {
-    const parsed = inputText
-      .split("\n")
-      .filter((line) => line.trim() !== "")
-      .map((text, i) => ({ text, id: i, singer: "A" as const, timestamp: null }))
+    const raw = inputText.split("\n")
+    const parsed: Line[] = []
+    let id = 0
+    let i = 0
+    while (i < raw.length) {
+      const line = raw[i].trim()
+      if (line === "") { i++; continue }
+      if (hasJapaneseChars(line)) {
+        const trans = i + 1 < raw.length && raw[i + 1].trim() !== "" && !hasJapaneseChars(raw[i + 1])
+          ? raw[i + 1].trim()
+          : null
+        parsed.push({ id, text: line, translation: trans, hasJapanese: true, singer: "A", timestamp: null })
+        id++
+        i += trans ? 2 : 1
+      } else {
+        parsed.push({ id, text: line, translation: null, hasJapanese: false, singer: "A", timestamp: null })
+        id++
+        i++
+      }
+    }
     setLines(parsed)
     setCurrentIndex(0)
     setVisible(true)
@@ -505,7 +528,35 @@ export default function Home() {
               >
                 {syncMode ? "Sync ON" : "Sync"}
               </button>
+
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className={`px-4 py-2 rounded-full border text-sm transition ${
+                  showSettings
+                    ? "border-zinc-300 text-white bg-zinc-700/30"
+                    : "border-zinc-700 text-zinc-400 hover:text-white"
+                }`}
+              >
+                ⚙ Pengaturan
+              </button>
             </div>
+
+            {showSettings && (
+              <div className="w-full max-w-sm rounded-xl border border-zinc-700 bg-zinc-900/80 p-4 backdrop-blur-sm flex flex-col gap-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Bahasa Jepang + Terjemahan</span>
+                  <span className="text-xs text-zinc-500">Otomatis terdeteksi</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Animasi</span>
+                  <span className="text-xs capitalize text-zinc-500">{animMode}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Mood</span>
+                  <span className="text-xs text-zinc-500">{moods[mood]?.emoji} {moods[mood]?.label}</span>
+                </div>
+              </div>
+            )}
 
             {audioFile && (
               <div className="w-full flex flex-col items-center gap-3">
@@ -635,37 +686,51 @@ export default function Home() {
                   )}
 
                   {animMode === "splittext" && lines[currentIndex] ? (
-                    <p
-                      className="flex flex-wrap justify-center text-2xl leading-relaxed font-medium min-h-[2em]"
-                      style={{ color: duetMode ? singerColors[lines[currentIndex]?.singer || "A"] : "inherit" }}
-                    >
-                      {lines[currentIndex].text.split("").map((char, i) => (
-                        <span
-                          key={`${splitKey}-${i}`}
-                          className="inline-block animate-split-in"
-                          style={{
-                            animationDelay: `${i * 0.08}s`,
-                          }}
-                        >
-                          {char === " " ? "\u00A0" : char}
-                        </span>
-                      ))}
-                    </p>
+                    <div className="flex flex-col items-center gap-2">
+                      <p
+                        className="flex flex-wrap justify-center text-2xl leading-relaxed font-medium min-h-[2em]"
+                        style={{ color: duetMode ? singerColors[lines[currentIndex]?.singer || "A"] : "inherit" }}
+                      >
+                        {lines[currentIndex].text.split("").map((char, i) => (
+                          <span
+                            key={`${splitKey}-${i}`}
+                            className="inline-block animate-split-in"
+                            style={{
+                              animationDelay: `${i * 0.08}s`,
+                            }}
+                          >
+                            {char === " " ? "\u00A0" : char}
+                          </span>
+                        ))}
+                      </p>
+                      {lines[currentIndex].hasJapanese && lines[currentIndex].translation && (
+                        <p className="text-sm text-zinc-400 text-center leading-relaxed max-w-md">
+                          {lines[currentIndex].translation}
+                        </p>
+                      )}
+                    </div>
                   ) : (
-                    <p
-                      className="text-2xl text-center leading-relaxed font-medium min-h-[2em]"
-                      style={{ color: duetMode ? singerColors[lines[currentIndex]?.singer || "A"] : "inherit" }}
-                    >
-                      {displayedText || (
-                        <span className="text-zinc-600 text-lg italic">—</span>
+                    <div className="flex flex-col items-center gap-2">
+                      <p
+                        className="text-2xl text-center leading-relaxed font-medium min-h-[2em]"
+                        style={{ color: duetMode ? singerColors[lines[currentIndex]?.singer || "A"] : "inherit" }}
+                      >
+                        {displayedText || (
+                          <span className="text-zinc-600 text-lg italic">—</span>
+                        )}
+                        {isTyping && (
+                          <span
+                            className="inline-block w-[2px] h-[1.2em] ml-0.5 animate-pulse"
+                            style={{ background: currentMood.from }}
+                          />
+                        )}
+                      </p>
+                      {lines[currentIndex]?.hasJapanese && lines[currentIndex]?.translation && (
+                        <p className="text-sm text-zinc-400 text-center leading-relaxed">
+                          {lines[currentIndex].translation}
+                        </p>
                       )}
-                      {isTyping && (
-                        <span
-                          className="inline-block w-[2px] h-[1.2em] ml-0.5 animate-pulse"
-                          style={{ background: currentMood.from }}
-                        />
-                      )}
-                    </p>
+                    </div>
                   )}
 
                   <div className="text-xs text-zinc-600">
