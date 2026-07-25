@@ -73,6 +73,7 @@ export default function Home() {
   const [wordIdx, setWordIdx] = useState(0)
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showLyrics, setShowLyrics] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const audioInitedRef = useRef(false)
@@ -173,7 +174,7 @@ export default function Home() {
   }, [autoScroll, startAutoScroll, stopAutoScroll])
 
   useEffect(() => {
-    if (!visible || lines.length === 0) return
+    if (!visible || lines.length === 0 || !showLyrics) return
     const line = lines[currentIndex]
     if (!line) return
 
@@ -194,7 +195,7 @@ export default function Home() {
     } else {
       startWordHighlight(line.text)
     }
-  }, [currentIndex, visible, lines, animMode, autoScroll]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentIndex, visible, lines, animMode, autoScroll, showLyrics]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const initAudioGraph = useCallback(() => {
     if (!audioRef.current || audioInitedRef.current) return
@@ -297,6 +298,7 @@ export default function Home() {
     setLines(parsed)
     setCurrentIndex(0)
     setVisible(true)
+    setShowLyrics(false)
     setSplitKey((k) => k + 1)
     setIsInputMode(parsed.length === 0)
     if (parsed.length > 0) {
@@ -687,152 +689,192 @@ export default function Home() {
                   visible ? "opacity-100" : "opacity-0"
                 }`}
               >
-                <div className="flex flex-col items-center gap-4 w-full">
-                  <div className="flex items-center gap-2 text-zinc-600">
-                    {lines.map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          if (syncMode) handleLineClick(i)
-                          handleJumpToTimestamp(lines[i].timestamp)
-                        }}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          i === currentIndex
-                            ? "w-8"
-                            : i < currentIndex
-                              ? "w-2 bg-zinc-600"
-                              : "w-2 bg-zinc-800"
-                        }`}
-                        style={i === currentIndex ? { background: currentMood.from } : {}}
-                        title={
-                          lines[i].timestamp !== null
-                            ? `${formatDuration(lines[i].timestamp)}`
-                            : syncMode
-                              ? "Click to set timestamp"
-                              : ""
-                        }
-                      />
-                    ))}
+                {!showLyrics ? (
+                  <div className="flex flex-col items-center gap-3 text-zinc-500">
+                    <span className="text-4xl">♪</span>
+                    <p className="text-base">Tekan Mulai untuk menampilkan lirik</p>
                   </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-4 w-full">
+                    <div className="flex items-center gap-2 text-zinc-600">
+                      {lines.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (syncMode) handleLineClick(i)
+                            handleJumpToTimestamp(lines[i].timestamp)
+                          }}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            i === currentIndex
+                              ? "w-8"
+                              : i < currentIndex
+                                ? "w-2 bg-zinc-600"
+                                : "w-2 bg-zinc-800"
+                          }`}
+                          style={i === currentIndex ? { background: currentMood.from } : {}}
+                          title={
+                            lines[i].timestamp !== null
+                              ? `${formatDuration(lines[i].timestamp)}`
+                              : syncMode
+                                ? "Click to set timestamp"
+                                : ""
+                          }
+                        />
+                      ))}
+                    </div>
 
-                  {duetMode && (
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{
-                          background: `${singerColors[lines[currentIndex]?.singer || "A"]}33`,
-                          color: singerColors[lines[currentIndex]?.singer || "A"],
-                        }}
-                      >
-                        {lines[currentIndex]?.singer === "A" ? "Singer A" : "Singer B"}
-                      </span>
-                      {lines[currentIndex]?.timestamp !== null && (
-                        <span className="text-xs text-zinc-500">
-                          {formatDuration(lines[currentIndex]?.timestamp || 0)}
+                    {duetMode && (
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{
+                            background: `${singerColors[lines[currentIndex]?.singer || "A"]}33`,
+                            color: singerColors[lines[currentIndex]?.singer || "A"],
+                          }}
+                        >
+                          {lines[currentIndex]?.singer === "A" ? "Singer A" : "Singer B"}
                         </span>
-                      )}
-                    </div>
-                  )}
-
-                  {animMode === "splittext" && lines[currentIndex] ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <p
-                        className="flex flex-wrap justify-center text-2xl leading-relaxed font-medium min-h-[2em]"
-                        style={{ color: duetMode ? singerColors[lines[currentIndex]?.singer || "A"] : "inherit" }}
-                      >
-                        {lines[currentIndex].text.split("").map((char, i) => (
-                          <span
-                            key={`${splitKey}-${i}`}
-                            className="inline-block animate-split-in"
-                            style={{
-                              animationDelay: `${i * 0.08}s`,
-                            }}
-                          >
-                            {char === " " ? "\u00A0" : char}
+                        {lines[currentIndex]?.timestamp !== null && (
+                          <span className="text-xs text-zinc-500">
+                            {formatDuration(lines[currentIndex]?.timestamp || 0)}
                           </span>
-                        ))}
-                      </p>
-                      {lines[currentIndex].hasJapanese && lines[currentIndex].translation && (
-                        <p className="text-sm text-zinc-400 text-center leading-relaxed max-w-md">
-                          {lines[currentIndex].translation}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <p
-                        className="text-2xl text-center leading-relaxed font-medium min-h-[2em]"
-                        style={{ color: duetMode ? singerColors[lines[currentIndex]?.singer || "A"] : "inherit" }}
-                      >
-                        {displayedText || (
-                          <span className="text-zinc-600 text-lg italic">—</span>
                         )}
-                        {isTyping && (
-                          <span
-                            className="inline-block w-[2px] h-[1.2em] ml-0.5 animate-pulse"
-                            style={{ background: currentMood.from }}
-                          />
-                        )}
-                      </p>
-                      {lines[currentIndex]?.hasJapanese && lines[currentIndex]?.translation && (
-                        <p className="text-sm text-zinc-400 text-center leading-relaxed">
-                          {lines[currentIndex].translation}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
 
-                  <div className="text-xs text-zinc-600">
-                    {currentIndex + 1} / {lines.length}
+                    {animMode === "splittext" && lines[currentIndex] ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <p
+                          className="flex flex-wrap justify-center text-2xl leading-relaxed font-medium min-h-[2em]"
+                          style={{ color: duetMode ? singerColors[lines[currentIndex]?.singer || "A"] : "inherit" }}
+                        >
+                          {lines[currentIndex].text.split("").map((char, i) => (
+                            <span
+                              key={`${splitKey}-${i}`}
+                              className="inline-block animate-split-in"
+                              style={{
+                                animationDelay: `${i * 0.08}s`,
+                              }}
+                            >
+                              {char === " " ? "\u00A0" : char}
+                            </span>
+                          ))}
+                        </p>
+                        {lines[currentIndex].hasJapanese && lines[currentIndex].translation && (
+                          <p className="text-sm text-zinc-400 text-center leading-relaxed max-w-md">
+                            {lines[currentIndex].translation}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <p
+                          className="text-2xl text-center leading-relaxed font-medium min-h-[2em]"
+                          style={{ color: duetMode ? singerColors[lines[currentIndex]?.singer || "A"] : "inherit" }}
+                        >
+                          {displayedText || (
+                            <span className="text-zinc-600 text-lg italic">—</span>
+                          )}
+                          {isTyping && (
+                            <span
+                              className="inline-block w-[2px] h-[1.2em] ml-0.5 animate-pulse"
+                              style={{ background: currentMood.from }}
+                            />
+                          )}
+                        </p>
+                        {lines[currentIndex]?.hasJapanese && lines[currentIndex]?.translation && (
+                          <p className="text-sm text-zinc-400 text-center leading-relaxed">
+                            {lines[currentIndex].translation}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="text-xs text-zinc-600">
+                      {currentIndex + 1} / {lines.length}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-4 mt-4">
-              {!autoScroll && (
+              {!showLyrics ? (
                 <button
-                  onClick={handleNext}
-                  disabled={currentIndex >= lines.length - 1}
-                  className="group relative px-10 py-3 rounded-full font-semibold text-lg transition active:scale-95 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setShowLyrics(true)
+                    setVisible(true)
+                    setSplitKey((k) => k + 1)
+                  }}
+                  disabled={!audioFile || lines.length === 0}
+                  className="group relative px-14 py-4 rounded-full font-bold text-lg transition active:scale-95 disabled:cursor-not-allowed"
                 >
                   <div
                     className={`absolute inset-0 rounded-full transition ${
-                      currentIndex >= lines.length - 1
+                      !audioFile || lines.length === 0
                         ? "bg-zinc-800"
                         : "opacity-80 group-hover:opacity-100"
                     }`}
                     style={
-                      currentIndex < lines.length - 1
-                        ? {
-                            background: `linear-gradient(to right, ${currentMood.from}, ${currentMood.via}, ${currentMood.to})`,
-                          }
+                      audioFile && lines.length > 0
+                        ? { background: `linear-gradient(to right, ${currentMood.from}, ${currentMood.via}, ${currentMood.to})` }
                         : {}
                     }
                   />
-                  <div
-                    className={`absolute inset-0 rounded-full transition ${
-                      currentIndex >= lines.length - 1
-                        ? ""
-                        : "bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent_60%)]"
-                    }`}
-                  />
+                  <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent_60%)]" />
                   <span
                     className={`relative ${
-                      currentIndex >= lines.length - 1 ? "text-zinc-500" : "text-white"
+                      !audioFile || lines.length === 0 ? "text-zinc-500" : "text-white"
                     }`}
                   >
-                    Next →
+                    Mulai
                   </span>
                 </button>
-              )}
+              ) : (
+                <>
+                  {!autoScroll && (
+                    <button
+                      onClick={handleNext}
+                      disabled={currentIndex >= lines.length - 1}
+                      className="group relative px-10 py-3 rounded-full font-semibold text-lg transition active:scale-95 disabled:cursor-not-allowed"
+                    >
+                      <div
+                        className={`absolute inset-0 rounded-full transition ${
+                          currentIndex >= lines.length - 1
+                            ? "bg-zinc-800"
+                            : "opacity-80 group-hover:opacity-100"
+                        }`}
+                        style={
+                          currentIndex < lines.length - 1
+                            ? { background: `linear-gradient(to right, ${currentMood.from}, ${currentMood.via}, ${currentMood.to})` }
+                            : {}
+                        }
+                      />
+                      <div
+                        className={`absolute inset-0 rounded-full transition ${
+                          currentIndex >= lines.length - 1
+                            ? ""
+                            : "bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent_60%)]"
+                        }`}
+                      />
+                      <span
+                        className={`relative ${
+                          currentIndex >= lines.length - 1 ? "text-zinc-500" : "text-white"
+                        }`}
+                      >
+                        Next →
+                      </span>
+                    </button>
+                  )}
 
-              <button
-                onClick={() => setIsInputMode(true)}
-                className="px-5 py-3 rounded-full border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800/50 text-sm transition"
-              >
-                Edit
-              </button>
+                  <button
+                    onClick={() => setIsInputMode(true)}
+                    className="px-5 py-3 rounded-full border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800/50 text-sm transition"
+                  >
+                    Edit
+                  </button>
+                </>
+              )}
             </div>
           </>
         )}
