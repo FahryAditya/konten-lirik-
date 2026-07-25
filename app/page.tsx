@@ -73,6 +73,9 @@ export default function Home() {
   const [wordIdx, setWordIdx] = useState(0)
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const audioInitedRef = useRef(false)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const typingRef = useRef<number | null>(null)
@@ -194,7 +197,7 @@ export default function Home() {
   }, [currentIndex, visible, lines, animMode, autoScroll]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const initAudioGraph = useCallback(() => {
-    if (!audioRef.current || audioCtx) return
+    if (!audioRef.current || audioInitedRef.current) return
     const ctx = new AudioContext()
     const gain = ctx.createGain()
     gain.gain.value = volume
@@ -207,6 +210,7 @@ export default function Home() {
     gain.connect(analyser)
     analyserRef.current = analyser
 
+    audioInitedRef.current = true
     setAudioCtx(ctx)
     setGainNode(gain)
 
@@ -214,7 +218,6 @@ export default function Home() {
       if (!canvasRef.current || !analyserRef.current) return
       const data = new Uint8Array(analyserRef.current.frequencyBinCount)
       analyserRef.current.getByteFrequencyData(data)
-      setPitchData(data)
 
       const canvas = canvasRef.current
       const c = canvas.getContext("2d")
@@ -223,12 +226,12 @@ export default function Home() {
       canvas.height = canvas.clientHeight * 2
       c.scale(2, 2)
 
-      c.clearRect(0, 0, canvas.width, canvas.height)
-      const barW = (canvas.clientWidth / data.length) * 2
+      c.clearRect(0, 0, canvas.width / 2, canvas.height / 2)
+      const barW = (canvas.width / data.length) * 0.5
       data.forEach((val, i) => {
-        const h = (val / 255) * (canvas.clientHeight * 0.8)
+        const h = (val / 255) * (canvas.height * 0.4)
         const x = i * barW
-        const y = canvas.clientHeight * 0.9 - h
+        const y = canvas.height * 0.45 - h
         const grad = c.createLinearGradient(x, y, x, y + h)
         grad.addColorStop(0, currentMood.from)
         grad.addColorStop(1, currentMood.via)
@@ -238,7 +241,33 @@ export default function Home() {
       animFrameRef.current = requestAnimationFrame(draw)
     }
     draw()
-  }, [audioCtx, volume, currentMood])
+  }, [volume, currentMood])
+
+  const handleTogglePlay = useCallback(() => {
+    if (!audioRef.current || !audioFile) return
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+      return
+    }
+    initAudioGraph()
+    const ctx = audioCtx
+    if (ctx && (ctx.state === "suspended")) ctx.resume()
+    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {})
+  }, [audioFile, initAudioGraph, audioCtx, isPlaying])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const onTime = () => setCurrentTime(audio.currentTime)
+    const onEnd = () => setIsPlaying(false)
+    audio.addEventListener("timeupdate", onTime)
+    audio.addEventListener("ended", onEnd)
+    return () => {
+      audio.removeEventListener("timeupdate", onTime)
+      audio.removeEventListener("ended", onEnd)
+    }
+  }, [audioFile])
 
   useEffect(() => {
     if (gainNode) gainNode.gain.value = volume
@@ -279,12 +308,14 @@ export default function Home() {
     const file = e.target.files?.[0]
     if (file) {
       const url = URL.createObjectURL(file)
+      if (audioFile) URL.revokeObjectURL(audioFile)
       setAudioFile(url)
+      setAudioCtx(null)
+      setGainNode(null)
+      audioInitedRef.current = false
+      analyserRef.current = null
+      setIsPlaying(false)
     }
-  }
-
-  const handleAudioPlay = () => {
-    initAudioGraph()
   }
 
   const handleNext = () => {
@@ -560,12 +591,30 @@ export default function Home() {
 
             {audioFile && (
               <div className="w-full flex flex-col items-center gap-3">
-                <audio
-                  ref={audioRef}
-                  controls
-                  className="w-full max-w-sm"
-                  onPlay={handleAudioPlay}
-                />
+                <audio ref={audioRef} src={audioFile} className="hidden" />
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleTogglePlay}
+                    className="group relative px-8 py-2.5 rounded-full font-semibold text-base transition active:scale-95"
+                  >
+                    <div
+                      className="absolute inset-0 rounded-full opacity-80 group-hover:opacity-100 transition"
+                      style={{
+                        background: `linear-gradient(to right, ${currentMood.from}, ${currentMood.via})`,
+                      }}
+                    />
+                    <span className="relative flex items-center gap-2">
+                      {isPlaying ? "⏸ Pause" : "▶ Mulai"}
+                    </span>
+                  </button>
+
+                  {isPlaying && (
+                    <span className="text-xs text-zinc-500 font-mono">
+                      {formatDuration(Math.floor(currentTime))}
+                    </span>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-4 w-full max-w-sm">
                   <span className="text-xs text-zinc-500 w-8 text-right">Vol</span>
